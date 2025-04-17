@@ -108,6 +108,28 @@ npm start
 - **GET** `/api/wallets/balance`
 - **Parámetros**: `document`, `phone`
 
+## Colección de Postman
+
+Para facilitar las pruebas de la API REST, se proporciona una colección de Postman completamente documentada:
+
+- [`billetera-virtual-api.postman_collection.json`](./billetera-virtual-api.postman_collection.json) - Colección con todos los endpoints
+- [`billetera-virtual-environment.postman_environment.json`](./billetera-virtual-environment.postman_environment.json) - Variables de entorno para pruebas
+- [`postman-documentation.md`](./postman-documentation.md) - Documentación detallada de uso
+
+### Importar y Usar la Colección
+
+1. Importa ambos archivos en Postman (Colección y Entorno)
+2. Selecciona el entorno "Billetera Virtual - Desarrollo"
+3. Sigue el flujo de pruebas recomendado:
+   - Registrar cliente
+   - Recargar billetera
+   - Consultar saldo
+   - Iniciar pago
+   - Confirmar pago
+   - Verificar nuevo saldo
+
+Para más detalles, consulta el archivo [`postman-documentation.md`](./postman-documentation.md).
+
 ## SOAP Service Endpoints
 
 - **Endpoint SOAP**: `http://localhost:8000/soap/wallet`
@@ -140,4 +162,4 @@ npm start
 
 ## Licencia
 
-Este proyecto está licenciado bajo la Licencia MIT. 
+Este proyecto está licenciado bajo la Licencia MIT.

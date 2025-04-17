@@ -1,0 +1,212 @@
+{
+	"info": {
+		"_postman_id": "c8e7e5f2-8b6a-4a3b-9c8d-5f9a1b2e3d4f",
+		"name": "Billetera Virtual API",
+		"description": "Colección de endpoints para el sistema de Billetera Virtual. Esta API REST actúa como puente entre el cliente y el servicio SOAP, permitiendo gestionar clientes, recargas, pagos y consultas de saldo.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Clientes",
+			"description": "Operaciones relacionadas con el registro y gestión de clientes.",
+			"item": [
+				{
+					"name": "Registrar Cliente",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"document\": \"12345678\",\n    \"name\": \"Juan Pérez\",\n    \"email\": \"juan.perez@ejemplo.com\",\n    \"phone\": \"3001234567\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/clients",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"clients"
+							]
+						},
+						"description": "Registra un nuevo cliente en el sistema con su documento, nombre, email y teléfono.\n\n### Parámetros requeridos\n- document: Número de documento de identidad (string)\n- name: Nombre completo del cliente (string)\n- email: Correo electrónico (string, formato email)\n- phone: Número de teléfono celular (string)\n\n### Respuesta exitosa\n```json\n{\n    \"success\": true,\n    \"code\": 201,\n    \"message\": \"Cliente registrado con éxito\",\n    \"data\": {\n        \"client_id\": 1\n    }\n}\n```\n\n### Posibles errores\n- 400: Datos de entrada inválidos\n- 409: El cliente ya existe con el documento, email o teléfono proporcionado\n- 500: Error interno del servidor"
+					}
+				}
+			]
+		},
+		{
+			"name": "Billetera",
+			"description": "Operaciones relacionadas con la gestión de la billetera virtual.",
+			"item": [
+				{
+					"name": "Recargar Billetera",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"document\": \"12345678\",\n    \"phone\": \"3001234567\",\n    \"amount\": 100000\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/wallets/recharge",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"wallets",
+								"recharge"
+							]
+						},
+						"description": "Recarga la billetera virtual de un cliente existente.\n\n### Parámetros requeridos\n- document: Número de documento de identidad (string)\n- phone: Número de teléfono celular (string)\n- amount: Monto a recargar (numeric, > 0)\n\n### Respuesta exitosa\n```json\n{\n    \"success\": true,\n    \"code\": 200,\n    \"message\": \"Recarga realizada con éxito\",\n    \"data\": {\n        \"new_balance\": 100000,\n        \"transaction_id\": 1\n    }\n}\n```\n\n### Posibles errores\n- 400: Datos de entrada inválidos o monto no positivo\n- 404: Cliente no encontrado\n- 500: Error interno del servidor"
+					}
+				},
+				{
+					"name": "Consultar Saldo",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/wallets/balance?document=12345678&phone=3001234567",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"wallets",
+								"balance"
+							],
+							"query": [
+								{
+									"key": "document",
+									"value": "12345678",
+									"description": "Número de documento de identidad"
+								},
+								{
+									"key": "phone",
+									"value": "3001234567",
+									"description": "Número de teléfono celular"
+								}
+							]
+						},
+						"description": "Consulta el saldo disponible en la billetera virtual de un cliente.\n\n### Parámetros requeridos\n- document: Número de documento de identidad (string)\n- phone: Número de teléfono celular (string)\n\n### Respuesta exitosa\n```json\n{\n    \"success\": true,\n    \"code\": 200,\n    \"message\": \"Saldo consultado con éxito\",\n    \"data\": {\n        \"client_id\": 1,\n        \"document\": \"12345678\",\n        \"name\": \"Juan Pérez\",\n        \"balance\": 100000\n    }\n}\n```\n\n### Posibles errores\n- 400: Datos de entrada inválidos\n- 404: Cliente no encontrado\n- 500: Error interno del servidor"
+					}
+				}
+			]
+		},
+		{
+			"name": "Pagos",
+			"description": "Operaciones relacionadas con el proceso de pago en dos pasos.",
+			"item": [
+				{
+					"name": "Iniciar Pago",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"document\": \"12345678\",\n    \"phone\": \"3001234567\",\n    \"amount\": 50000\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/payments/start",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"payments",
+								"start"
+							]
+						},
+						"description": "Inicia un proceso de pago, generando un token de confirmación y un ID de sesión.\n\n### Parámetros requeridos\n- document: Número de documento de identidad (string)\n- phone: Número de teléfono celular (string)\n- amount: Monto a pagar (numeric, > 0)\n\n### Respuesta exitosa\n```json\n{\n    \"success\": true,\n    \"code\": 200,\n    \"message\": \"Se ha enviado un token de confirmación al correo registrado\",\n    \"data\": {\n        \"session_id\": \"a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6\",\n        \"token\": \"123456\" // En ambiente de producción, este valor no se muestra en la respuesta\n    }\n}\n```\n\n### Posibles errores\n- 400: Datos de entrada inválidos, monto no positivo o saldo insuficiente\n- 404: Cliente no encontrado\n- 500: Error interno del servidor\n\n### Nota importante\nEn un entorno de producción, el token no se muestra en la respuesta API y se envía únicamente al correo del usuario. Para efectos de prueba, se muestra en la respuesta."
+					}
+				},
+				{
+					"name": "Confirmar Pago",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"session_id\": \"a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6\",\n    \"token\": \"123456\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/payments/confirm",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"payments",
+								"confirm"
+							]
+						},
+						"description": "Confirma un pago previamente iniciado utilizando el ID de sesión y el token de confirmación.\n\n### Parámetros requeridos\n- session_id: Identificador único de la sesión de pago (string)\n- token: Código de confirmación de 6 dígitos (string)\n\n### Respuesta exitosa\n```json\n{\n    \"success\": true,\n    \"code\": 200,\n    \"message\": \"Pago confirmado con éxito\",\n    \"data\": {\n        \"transaction_id\": 2,\n        \"new_balance\": 50000\n    }\n}\n```\n\n### Posibles errores\n- 400: Datos de entrada inválidos o saldo insuficiente\n- 404: Transacción no encontrada o ya procesada\n- 500: Error interno del servidor"
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8080/api",
+			"description": "URL base de la API REST de Billetera Virtual"
+		}
+	]
+} 
