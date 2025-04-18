@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'wallet' => [
+        'use_doctrine' => env('USE_DOCTRINE', false),
+    ],
+
 ];

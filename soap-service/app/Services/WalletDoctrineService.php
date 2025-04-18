@@ -2,15 +2,23 @@
 
 namespace App\Services;
 
-use App\Models\Client;
-use App\Models\Transaction;
-use Illuminate\Support\Facades\DB;
+use App\Doctrine\Entities\Client;
+use App\Doctrine\Repositories\ClientRepository;
+use App\Doctrine\Repositories\TransactionRepository;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
-class WalletSoapService implements WalletServiceInterface
+class WalletDoctrineService implements WalletServiceInterface
 {
+    private ClientRepository $clientRepository;
+    private TransactionRepository $transactionRepository;
+
+    public function __construct()
+    {
+        $this->clientRepository = new ClientRepository();
+        $this->transactionRepository = new TransactionRepository();
+    }
+
     /**
      * Registra un nuevo cliente en el sistema
      *
@@ -33,12 +41,7 @@ class WalletSoapService implements WalletServiceInterface
             }
 
             // Verificar si el cliente ya existe
-            $exists = Client::where('document', $document)
-                ->orWhere('email', $email)
-                ->orWhere('phone', $phone)
-                ->exists();
-
-            if ($exists) {
+            if ($this->clientRepository->exists($document, $email, $phone)) {
                 return [
                     'success' => false,
                     'code' => 409,
@@ -47,20 +50,21 @@ class WalletSoapService implements WalletServiceInterface
             }
 
             // Crear nuevo cliente
-            $client = Client::create([
-                'document' => $document,
-                'name' => $name,
-                'email' => $email,
-                'phone' => $phone,
-                'balance' => 0
-            ]);
+            $client = new Client();
+            $client->setDocument($document)
+                ->setName($name)
+                ->setEmail($email)
+                ->setPhone($phone)
+                ->setBalance(0);
+            
+            $this->clientRepository->save($client);
 
             return [
                 'success' => true,
                 'code' => 201,
                 'message' => 'Cliente registrado con éxito',
                 'data' => [
-                    'client_id' => $client->id
+                    'client_id' => $client->getId()
                 ]
             ];
         } catch (\Exception $e) {
@@ -104,9 +108,7 @@ class WalletSoapService implements WalletServiceInterface
             }
 
             // Buscar cliente
-            $client = Client::where('document', $document)
-                ->where('phone', $phone)
-                ->first();
+            $client = $this->clientRepository->findByDocumentAndPhone($document, $phone);
 
             if (!$client) {
                 return [
@@ -116,34 +118,31 @@ class WalletSoapService implements WalletServiceInterface
                 ];
             }
 
-            // Actualizar balance usando una transacción
-            DB::beginTransaction();
+            // Iniciar transacción Doctrine
+            $entityManager = DoctrineService::getEntityManager();
+            $entityManager->beginTransaction();
+            
             try {
                 // Registrar transacción
-                $transaction = Transaction::create([
-                    'client_id' => $client->id,
-                    'type' => 'deposit',
-                    'amount' => $amount,
-                    'status' => 'completed'
-                ]);
+                $transaction = $this->transactionRepository->createDeposit($client, $amount);
 
                 // Actualizar saldo
-                $client->balance += $amount;
-                $client->save();
+                $client->setBalance($client->getBalance() + $amount);
+                $this->clientRepository->save($client);
 
-                DB::commit();
+                $entityManager->commit();
 
                 return [
                     'success' => true,
                     'code' => 200,
                     'message' => 'Recarga realizada con éxito',
                     'data' => [
-                        'new_balance' => $client->balance,
-                        'transaction_id' => $transaction->id
+                        'new_balance' => $client->getBalance(),
+                        'transaction_id' => $transaction->getId()
                     ]
                 ];
             } catch (\Exception $e) {
-                DB::rollBack();
+                $entityManager->rollback();
                 throw $e;
             }
         } catch (\Exception $e) {
@@ -187,9 +186,7 @@ class WalletSoapService implements WalletServiceInterface
             }
 
             // Buscar cliente
-            $client = Client::where('document', $document)
-                ->where('phone', $phone)
-                ->first();
+            $client = $this->clientRepository->findByDocumentAndPhone($document, $phone);
 
             if (!$client) {
                 return [
@@ -200,7 +197,7 @@ class WalletSoapService implements WalletServiceInterface
             }
 
             // Verificar saldo suficiente
-            if ($client->balance < $amount) {
+            if ($client->getBalance() < $amount) {
                 return [
                     'success' => false,
                     'code' => 400,
@@ -209,29 +206,22 @@ class WalletSoapService implements WalletServiceInterface
             }
 
             // Generar token y session_id
-            $token = mt_rand(100000, 999999);
+            $token = (string)mt_rand(100000, 999999);
             $sessionId = Str::uuid()->toString();
 
-            // Crear transacción pendiente
-            $transaction = Transaction::create([
-                'client_id' => $client->id,
-                'type' => 'payment',
-                'amount' => $amount,
-                'session_id' => $sessionId,
-                'token' => $token,
-                'status' => 'pending'
-            ]);
+            // Registrar transacción pendiente
+            $transaction = $this->transactionRepository->createPendingPayment($client, $amount, $sessionId, $token);
 
-            // Aquí se enviaría el email con el token
-            // En un entorno real, se usaría Mail::to($client->email)->send(new PaymentTokenMail($token));
-            
+            // En un caso real, aquí se enviaría el token por email
+            // Mail::to($client->getEmail())->send(new PaymentTokenMail($token));
+
             return [
                 'success' => true,
                 'code' => 200,
                 'message' => 'Se ha enviado un token de confirmación al correo registrado',
                 'data' => [
                     'session_id' => $sessionId,
-                    'token' => $token // En producción real, no se debería devolver el token
+                    'token' => $token // Solo para entorno de desarrollo
                 ]
             ];
         } catch (\Exception $e) {
@@ -246,7 +236,7 @@ class WalletSoapService implements WalletServiceInterface
     }
 
     /**
-     * Confirma un pago usando el token enviado
+     * Confirma un pago con un token
      *
      * @param string $sessionId ID de sesión del pago
      * @param string $token Token de confirmación
@@ -265,10 +255,7 @@ class WalletSoapService implements WalletServiceInterface
             }
 
             // Buscar transacción
-            $transaction = Transaction::where('session_id', $sessionId)
-                ->where('token', $token)
-                ->where('status', 'pending')
-                ->first();
+            $transaction = $this->transactionRepository->findBySessionAndToken($sessionId, $token);
 
             if (!$transaction) {
                 return [
@@ -279,12 +266,12 @@ class WalletSoapService implements WalletServiceInterface
             }
 
             // Obtener cliente
-            $client = $transaction->client;
+            $client = $transaction->getClient();
 
             // Verificar saldo suficiente (podría haber cambiado desde la solicitud inicial)
-            if ($client->balance < $transaction->amount) {
-                $transaction->status = 'cancelled';
-                $transaction->save();
+            if ($client->getBalance() < $transaction->getAmount()) {
+                $transaction->setStatus('cancelled');
+                $this->transactionRepository->save($transaction);
                 
                 return [
                     'success' => false,
@@ -294,29 +281,31 @@ class WalletSoapService implements WalletServiceInterface
             }
 
             // Procesar pago
-            DB::beginTransaction();
+            $entityManager = DoctrineService::getEntityManager();
+            $entityManager->beginTransaction();
+            
             try {
                 // Actualizar saldo
-                $client->balance -= $transaction->amount;
-                $client->save();
+                $client->setBalance($client->getBalance() - $transaction->getAmount());
+                $this->clientRepository->save($client);
 
                 // Marcar transacción como completada
-                $transaction->status = 'completed';
-                $transaction->save();
+                $transaction->setStatus('completed');
+                $this->transactionRepository->save($transaction);
 
-                DB::commit();
+                $entityManager->commit();
 
                 return [
                     'success' => true,
                     'code' => 200,
                     'message' => 'Pago confirmado con éxito',
                     'data' => [
-                        'transaction_id' => $transaction->id,
-                        'new_balance' => $client->balance
+                        'transaction_id' => $transaction->getId(),
+                        'new_balance' => $client->getBalance()
                     ]
                 ];
             } catch (\Exception $e) {
-                DB::rollBack();
+                $entityManager->rollback();
                 throw $e;
             }
         } catch (\Exception $e) {
@@ -350,9 +339,7 @@ class WalletSoapService implements WalletServiceInterface
             }
 
             // Buscar cliente
-            $client = Client::where('document', $document)
-                ->where('phone', $phone)
-                ->first();
+            $client = $this->clientRepository->findByDocumentAndPhone($document, $phone);
 
             if (!$client) {
                 return [
@@ -367,10 +354,10 @@ class WalletSoapService implements WalletServiceInterface
                 'code' => 200,
                 'message' => 'Saldo consultado con éxito',
                 'data' => [
-                    'client_id' => $client->id,
-                    'document' => $client->document,
-                    'name' => $client->name,
-                    'balance' => $client->balance
+                    'client_id' => $client->getId(),
+                    'document' => $client->getDocument(),
+                    'name' => $client->getName(),
+                    'balance' => $client->getBalance()
                 ]
             ];
         } catch (\Exception $e) {

@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\WalletSoapService;
+use App\Services\WalletServiceInterface;
 use Illuminate\Http\Request;
 
 class SoapController extends Controller
 {
     protected $walletService;
 
-    public function __construct(WalletSoapService $walletService)
+    public function __construct(WalletServiceInterface $walletService)
     {
         $this->walletService = $walletService;
     }
